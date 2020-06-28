@@ -1,4 +1,4 @@
-from .can import CAN_EFF_FLAG, CAN_RTR_FLAG, CAN_ERR_FLAG, CAN_EFF_MASK
+from .constants import CAN_EFF_FLAG, CAN_RTR_FLAG, CAN_ERR_FLAG, CAN_EFF_MASK
 
 # gs_usb general
 GS_USB_ECHO_ID = 0
