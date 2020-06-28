@@ -4,22 +4,9 @@ import platform
 import usb.core
 import usb.util
 
-# CAN bus error
-CAN_ERR_BUSOFF = 0x00000001
-CAN_ERR_RX_TX_WARNING = 0x00000002
-CAN_ERR_RX_TX_PASSIVE = 0x00000004
-CAN_ERR_OVERLOAD = 0x00000008
-CAN_ERR_STUFF = 0x00000010
-CAN_ERR_FORM = 0x00000020
-CAN_ERR_ACK = 0x00000040
-CAN_ERR_BIT_RECESSIVE = 0x00000080
-CAN_ERR_BIT_DOMINANT = 0x00000100
-CAN_ERR_CRC = 0x00000200
-
 # gs_usb general
-GS_USB_ECHO_ID = 0
-GS_USB_NONE_ECHO_ID = 0xFFFFFFFF
-GS_USB_FRAME_SIZE = 24
+GS_USB_ID_VENDOR = 0x1D50
+GS_USB_ID_PRODUCT = 0x606F
 
 # gs_usb mode
 GS_USB_MODE_NORMAL = 0
@@ -28,27 +15,16 @@ GS_USB_MODE_LOOP_BACK = 1 << 1
 GS_USB_MODE_ONE_SHOT = 1 << 3
 GS_USB_MODE_NO_ECHO_BACK = 1 << 8
 
-
-class GsUsbFrame:
-    def __init__(self):
-        self.echo_id = GS_USB_ECHO_ID
-        self.can_id = 0
-        self.can_dlc = 0
-        self.channel = 0
-        self.flags = 0
-        self.reserved = 0
-        self.data = [0x00] * 8
-        self.timestamp_us = 0
-
-    def __sizeof__(self):
-        return GS_USB_FRAME_SIZE
+# gs_usb control request
+__GS_USB_BREQ_HOST_FORMAT = 0
+__GS_USB_BREQ_BITTIMING = 1
+__GS_USB_BREQ_MODE = 2
+__GS_USB_BREQ_BERR = 3
+__GS_USB_BREQ_BT_CONST = 4
+__GS_USB_BREQ_DEVICE_CONFIG = 5
 
 
 class GsUsb:
-    # gs_usb control request
-    __GS_USB_BREQ_BITTIMING = 1
-    __GS_USB_BREQ_MODE = 2
-    __GS_USB_BREQ_DEVICE_CONFIG = 5
 
     def __init__(self, gs_usb):
         self.gs_usb = gs_usb
@@ -76,7 +52,11 @@ class GsUsb:
         mode_ = 0
         mode = 0
         data = pack("II", mode_, mode)
-        self.gs_usb.ctrl_transfer(0x41, __GS_USB_BREQ_MODE, 0, 0, data)
+
+        try:
+            self.gs_usb.ctrl_transfer(0x41, __GS_USB_BREQ_MODE, 0, 0, data)
+        except usb.core.USBError:
+            pass
 
     def set_bitrate(self, bitrate):
         """
@@ -121,21 +101,6 @@ class GsUsb:
         data = pack("5I", prop_seg, phase_seg1, phase_seg2, sjw, brp)
         self.gs_usb.ctrl_transfer(0x41, __GS_USB_BREQ_BITTIMING, 0, 0, data)
 
-    def get_serial_number(self):
-        r"""
-        Get gs_usb device serial number in string format
-        """
-        return self.gs_usb.serial_number
-
-    def get_device_info(self):
-        r"""
-        Get gs_usb device info
-        """
-        data = self.gs_usb.ctrl_transfer(0xC1, __GS_USB_BREQ_DEVICE_CONFIG, 0, 0, 12)
-        tup = unpack("4B2I", data)
-        info = "fw: " + str(tup[4] / 10) + " hw: " + str(tup[5] / 10)
-        return info
-
     def send(self, frame):
         r"""
         Send frame
@@ -158,13 +123,15 @@ class GsUsb:
         r"""
         Read frame
         :param frame: GsUsbFrame
-        :param timeout_ms: read time out in ms
+        :param timeout_ms: read time out in ms.
+                           Note that timeout as 0 will block forever if no message is received 
         :return: return True if success else False
         """
         try:
             data = self.gs_usb.read(0x81, frame.__sizeof__(), timeout_ms)
         except usb.core.USBError:
             return False
+
         (
             frame.echo_id,
             frame.can_id,
@@ -177,50 +144,49 @@ class GsUsb:
         ) = unpack("2I12BI", data)
         return True
 
+    @property
+    def bus(self):
+        return self.gs_usb.bus
+
+    @property
+    def address(self):
+        return self.gs_usb.address
+
+    @property
+    def serial_number(self):
+        r"""
+        Get gs_usb device serial number in string format
+        """
+        return self.gs_usb.serial_number
+
+    @property
+    def device_info(self):
+        r"""
+        Get gs_usb device info
+        """
+        data = self.gs_usb.ctrl_transfer(0xC1, __GS_USB_BREQ_DEVICE_CONFIG, 0, 0, 12)
+        tup = unpack("4B2I", data)
+        info = "fw: " + str(tup[4] / 10) + " hw: " + str(tup[5] / 10)
+        return info
+
+    def __str__(self):
+        try:
+            _ = "{} ({})".format(self.gs_usb.product, repr(self.gs_usb))
+        except (ValueError, usb.core.USBError):
+            return ""
+        return _
+            
     @staticmethod
     def scan():
         r"""
         Retrieve the list of gs_usb devices handle
         :return: list of gs_usb devices handle
         """
-        return list(usb.core.find(find_all=True, idVendor=0x1D50, idProduct=0x606F))
-
+        return [GsUsb(dev) for dev in usb.core.find(find_all=True, idVendor=GS_USB_ID_VENDOR, idProduct=GS_USB_ID_PRODUCT)]
+    
     @staticmethod
-    def parse_err_frame(frame):
-        r"""
-        Parse can bus error status
-        :param frame: error frame
-        :return: a tuple of error code, err_tx, err_rx
-        """
-        error_code = 0
-
-        if frame.can_id & 0x00000040:
-            error_code |= CAN_ERR_BUSOFF
-
-        if frame.data[1] & 0x04:
-            error_code |= CAN_ERR_RX_TX_WARNING
-        elif frame.data[1] & 0x10:
-            error_code |= CAN_ERR_RX_TX_PASSIVE
-
-        if frame.flags & 0x00000001:
-            error_code |= CAN_ERR_OVERLOAD
-
-        if frame.data[2] & 0x04:
-            error_code |= CAN_ERR_STUFF
-
-        if frame.data[2] & 0x02:
-            error_code |= CAN_ERR_FORM
-
-        if frame.can_id & 0x00000020:
-            error_code |= CAN_ERR_ACK
-
-        if frame.data[2] & 0x10:
-            error_code |= CAN_ERR_BIT_RECESSIVE
-
-        if frame.data[2] & 0x08:
-            error_code |= CAN_ERR_BIT_DOMINANT
-
-        if frame.data[3] & 0x08:
-            error_code |= CAN_ERR_CRC
-
-        return error_code, int(frame.data[6]), int(frame.data[7])
+    def find(bus, address):
+        gs_usb = usb.core.find(idVendor=GS_USB_ID_VENDOR, idProduct=GS_USB_ID_PRODUCT, bus=bus, address=address)
+        if gs_usb:
+            return GsUsb(gs_usb)
+        return None
