@@ -17,9 +17,6 @@ class GsUsbFrame:
         self.data = [0x00] * 8
         self.timestamp_us = 0
 
-        if not self.can_id:
-            raise ValueError("CAN ID is not set")
-
     def __sizeof__(self):
         return GS_USB_FRAME_SIZE
 
