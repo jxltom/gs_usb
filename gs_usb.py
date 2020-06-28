@@ -16,12 +16,12 @@ GS_USB_MODE_ONE_SHOT = 1 << 3
 GS_USB_MODE_NO_ECHO_BACK = 1 << 8
 
 # gs_usb control request
-__GS_USB_BREQ_HOST_FORMAT = 0
-__GS_USB_BREQ_BITTIMING = 1
-__GS_USB_BREQ_MODE = 2
-__GS_USB_BREQ_BERR = 3
-__GS_USB_BREQ_BT_CONST = 4
-__GS_USB_BREQ_DEVICE_CONFIG = 5
+_GS_USB_BREQ_HOST_FORMAT = 0
+_GS_USB_BREQ_BITTIMING = 1
+_GS_USB_BREQ_MODE = 2
+_GS_USB_BREQ_BERR = 3
+_GS_USB_BREQ_BT_CONST = 4
+_GS_USB_BREQ_DEVICE_CONFIG = 5
 
 
 class GsUsb:
@@ -37,7 +37,7 @@ class GsUsb:
         mode_ = 1
         mode |= 1 << 4
         data = pack("II", mode_, mode)
-        self.gs_usb.ctrl_transfer(0x41, __GS_USB_BREQ_MODE, 0, 0, data)
+        self.gs_usb.ctrl_transfer(0x41, _GS_USB_BREQ_MODE, 0, 0, data)
 
         # Detach usb from kernel driver in Linux/Unix system to perform IO
         if "windows" not in platform.system().lower() and self.gs_usb.is_kernel_driver_active(
@@ -54,7 +54,7 @@ class GsUsb:
         data = pack("II", mode_, mode)
 
         try:
-            self.gs_usb.ctrl_transfer(0x41, __GS_USB_BREQ_MODE, 0, 0, data)
+            self.gs_usb.ctrl_transfer(0x41, _GS_USB_BREQ_MODE, 0, 0, data)
         except usb.core.USBError:
             pass
 
@@ -99,7 +99,7 @@ class GsUsb:
         :param brp: prescaler for quantum where base_clk = 48MHz (1~1024)
         """
         data = pack("5I", prop_seg, phase_seg1, phase_seg2, sjw, brp)
-        self.gs_usb.ctrl_transfer(0x41, __GS_USB_BREQ_BITTIMING, 0, 0, data)
+        self.gs_usb.ctrl_transfer(0x41, _GS_USB_BREQ_BITTIMING, 0, 0, data)
 
     def send(self, frame):
         r"""
@@ -164,7 +164,7 @@ class GsUsb:
         r"""
         Get gs_usb device info
         """
-        data = self.gs_usb.ctrl_transfer(0xC1, __GS_USB_BREQ_DEVICE_CONFIG, 0, 0, 12)
+        data = self.gs_usb.ctrl_transfer(0xC1, _GS_USB_BREQ_DEVICE_CONFIG, 0, 0, 12)
         tup = unpack("4B2I", data)
         info = "fw: " + str(tup[4] / 10) + " hw: " + str(tup[5] / 10)
         return info
