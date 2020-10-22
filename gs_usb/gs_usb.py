@@ -89,6 +89,9 @@ class GsUsb:
             self.set_timing(prop_seg, 11, 2, sjw, 4)
         elif bitrate == 1000000:
             self.set_timing(prop_seg, 11, 2, sjw, 3)
+        else:
+            return False
+        return True
 
     def set_timing(self, prop_seg, phase_seg1, phase_seg2, sjw, brp):
         r"""
