@@ -7,18 +7,16 @@ GS_USB_FRAME_SIZE = 24
 
 
 class GsUsbFrame:
-    def __init__(self):
+    def __init__(self, can_id=0, data=[0x00] * 8):
         self.echo_id = GS_USB_ECHO_ID
-        self.can_id = 0
-        self.can_dlc = 0
+        self.can_id = can_id
         self.channel = 0
         self.flags = 0
         self.reserved = 0
-        self.data = [0x00] * 8
+        self.data = data
         self.timestamp_us = 0
 
-    def __sizeof__(self):
-        return GS_USB_FRAME_SIZE
+        self.can_dlc = len(self.data)
 
     @property
     def arbitration_id(self) -> int:
