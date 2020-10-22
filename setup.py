@@ -10,7 +10,7 @@ from setuptools import find_packages, setup, Command
 
 # Package meta-data.
 NAME = "gs_usb"
-DESCRIPTION = "Python Windows/Linux CAN driver based on WCID for Geschwister Schneider USB/CAN devices and candleLight USB CAN interfaces."
+DESCRIPTION = "Python Windows/Linux CAN driver based on usbfs or WinUSB WCID for Geschwister Schneider USB/CAN devices and candleLight USB CAN interfaces."
 URL = 'https://github.com/jxltom/gs_usb'
 EMAIL = "jxltom@gmail.com"
 AUTHOR = "jxltom"
