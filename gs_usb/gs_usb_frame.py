@@ -37,3 +37,14 @@ class GsUsbFrame:
     @property
     def timestamp(self):
         return self.timestamp_us / 1000000.0
+
+    def __sizeof__(self):
+        return GS_USB_FRAME_SIZE
+
+    def __str__(self) -> str:
+        data = (
+            "remote request"
+            if self.is_remote_frame
+            else " ".join("{:02X}".format(b) for b in self.data)
+        )
+        return "{: >8X}   [{}]  {}".format(self.arbitration_id, self.can_dlc, data)    
