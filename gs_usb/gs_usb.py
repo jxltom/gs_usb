@@ -1,6 +1,7 @@
 from struct import *
 import platform
 
+from usb.backend import libusb0
 import usb.core
 import usb.util
 
@@ -182,11 +183,11 @@ class GsUsb:
         Retrieve the list of gs_usb devices handle
         :return: list of gs_usb devices handle
         """
-        return [GsUsb(dev) for dev in usb.core.find(find_all=True, idVendor=GS_USB_ID_VENDOR, idProduct=GS_USB_ID_PRODUCT)]
+        return [GsUsb(dev) for dev in usb.core.find(find_all=True, idVendor=GS_USB_ID_VENDOR, idProduct=GS_USB_ID_PRODUCT, backend=libusb0.get_backend())]
     
     @staticmethod
     def find(bus, address):
-        gs_usb = usb.core.find(idVendor=GS_USB_ID_VENDOR, idProduct=GS_USB_ID_PRODUCT, bus=bus, address=address)
+        gs_usb = usb.core.find(idVendor=GS_USB_ID_VENDOR, idProduct=GS_USB_ID_PRODUCT, bus=bus, address=address, backend=libusb0.get_backend())
         if gs_usb:
             return GsUsb(gs_usb)
         return None
