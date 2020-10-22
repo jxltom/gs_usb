@@ -122,6 +122,7 @@ class GsUsb:
             frame.timestamp_us
         )
         self.gs_usb.write(0x02, data)
+        return True
 
     def read(self, frame, timeout_ms):
         r"""
