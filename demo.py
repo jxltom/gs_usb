@@ -1,14 +1,3 @@
-# gs_usb
-
-Python Windows/Linux/Mac CAN driver based on usbfs or WinUSB WCID for Geschwister Schneider USB/CAN devices and candleLight USB CAN interfaces.
-
-## Getting Started
-
-Install by ```pip install gs_usb```
-
-Below is a basic demo for CAN message sending and receiving.
-
-```python
 import time
 
 from gs_usb.gs_usb import GsUsb
@@ -78,4 +67,3 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         pass
-```
