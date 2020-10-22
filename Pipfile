@@ -10,6 +10,7 @@ python_version = "3.7"
 allow_prereleases = true
 
 [packages]
+gs_usb = {editable = true, path = "."}
 
 [dev-packages]
 twine = "*"

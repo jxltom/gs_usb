@@ -1,0 +1,3 @@
+-i https://pypi.org/simple
+-e .
+pyusb==1.1.0
