@@ -18,3 +18,4 @@ black = "*"
 
 [scripts]
 publish = "python setup.py upload"
+demo = "python demo.py"
