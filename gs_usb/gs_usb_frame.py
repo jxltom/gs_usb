@@ -7,16 +7,21 @@ GS_USB_FRAME_SIZE = 24
 
 
 class GsUsbFrame:
-    def __init__(self, can_id=0, data=[0x00] * 8):
+    def __init__(self, can_id=0, data=[]):
         self.echo_id = GS_USB_ECHO_ID
         self.can_id = can_id
         self.channel = 0
         self.flags = 0
         self.reserved = 0
-        self.data = data
         self.timestamp_us = 0
 
-        self.can_dlc = len(self.data)
+        if type(data) == bytes:
+            z = list(data)
+        else:
+            z = data
+
+        self.data = z + [0] * (8 - len(z))
+        self.can_dlc = len(data)
 
     @property
     def arbitration_id(self) -> int:
@@ -45,6 +50,6 @@ class GsUsbFrame:
         data = (
             "remote request"
             if self.is_remote_frame
-            else " ".join("{:02X}".format(b) for b in self.data)
+            else " ".join("{:02X}".format(b) for b in self.data[:self.can_dlc])
         )
-        return "{: >8X}   [{}]  {}".format(self.arbitration_id, self.can_dlc, data)    
+        return "{: >8X}   [{}]  {}".format(self.arbitration_id, self.can_dlc, data)
