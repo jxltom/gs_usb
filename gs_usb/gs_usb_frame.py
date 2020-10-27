@@ -16,11 +16,9 @@ class GsUsbFrame:
         self.timestamp_us = 0
 
         if type(data) == bytes:
-            z = list(data)
-        else:
-            z = data
+            data = list(data)
 
-        self.data = z + [0] * (8 - len(z))
+        self.data = data + [0] * (8 - len(data))
         self.can_dlc = len(data)
 
     @property
