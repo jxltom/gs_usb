@@ -1,7 +1,6 @@
 from struct import *
 import platform
 
-from usb.backend import libusb0
 import usb.core
 import usb.util
 
@@ -192,7 +191,6 @@ class GsUsb:
                 find_all=True,
                 idVendor=GS_USB_ID_VENDOR,
                 idProduct=GS_USB_ID_PRODUCT,
-                backend=libusb0.get_backend(),
             )
         ]
 
@@ -203,7 +201,6 @@ class GsUsb:
             idProduct=GS_USB_ID_PRODUCT,
             bus=bus,
             address=address,
-            backend=libusb0.get_backend(),
         )
         if gs_usb:
             return GsUsb(gs_usb)
