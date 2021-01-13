@@ -34,16 +34,21 @@ class GsUsb:
         Start gs_usb device
         :param mode: GS_USB_MODE_NORMAL, GS_USB_MODE_LISTEN_ONLY, etc.
         """
-        mode_ = 1
-        mode |= 1 << 4
-        data = pack("II", mode_, mode)
-        self.gs_usb.ctrl_transfer(0x41, _GS_USB_BREQ_MODE, 0, 0, data)
+        # Reset to support restart multiple times
+        self.gs_usb.reset()
 
         # Detach usb from kernel driver in Linux/Unix system to perform IO
         if "windows" not in platform.system().lower() and self.gs_usb.is_kernel_driver_active(
             0
         ):
             self.gs_usb.detach_kernel_driver(0)
+
+        mode_ = 1
+        mode |= 1 << 4
+        data = pack("II", mode_, mode)
+        self.gs_usb.ctrl_transfer(0x41, _GS_USB_BREQ_MODE, 0, 0, data)
+
+        
 
     def stop(self):
         r"""
