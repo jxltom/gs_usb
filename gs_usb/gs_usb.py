@@ -92,7 +92,7 @@ class GsUsb:
         elif bitrate == 800000:
             self.set_timing(prop_seg, 11, 2, sjw, 4)
         elif bitrate == 1000000:
-            self.set_timing(prop_seg, 11, 2, sjw, 3)
+            self.set_timing(prop_seg, 12, 2, sjw, 3)
         else:
             return False
         return True
