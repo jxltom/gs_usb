@@ -39,6 +39,7 @@ class GsUsb:
     def __init__(self, gs_usb):
         self.gs_usb = gs_usb
         self.capability = None
+        self.device_flags = None
 
     def start(self, flags=(GS_CAN_MODE_NORMAL | GS_CAN_MODE_HW_TIMESTAMP)):
         r"""
@@ -59,6 +60,7 @@ class GsUsb:
 
         # Only allow features that this driver supports
         flags &= GS_CAN_MODE_LISTEN_ONLY | GS_CAN_MODE_LOOP_BACK | GS_CAN_MODE_ONE_SHOT | GS_CAN_MODE_HW_TIMESTAMP
+        self.device_flags = flags
 
         mode = DeviceMode(GS_CAN_MODE_START, flags)
         self.gs_usb.ctrl_transfer(0x41, _GS_USB_BREQ_MODE, 0, 0, mode.pack())
@@ -154,7 +156,7 @@ class GsUsb:
         :param frame: GsUsbFrame
         """
         #Frame size is different depending on HW timestamp feature support
-        hw_timestamps = ((self.device_capability.feature & GS_CAN_MODE_HW_TIMESTAMP) == GS_CAN_MODE_HW_TIMESTAMP)
+        hw_timestamps = ((self.device_flags & GS_CAN_MODE_HW_TIMESTAMP) == GS_CAN_MODE_HW_TIMESTAMP)
         self.gs_usb.write(0x02, frame.pack(hw_timestamps))
         return True
 
@@ -167,7 +169,7 @@ class GsUsb:
         :return: return True if success else False
         """
         #Frame size is different depending on HW timestamp feature support
-        hw_timestamps = ((self.device_capability.feature & GS_CAN_MODE_HW_TIMESTAMP) == GS_CAN_MODE_HW_TIMESTAMP)
+        hw_timestamps = ((self.device_flags & GS_CAN_MODE_HW_TIMESTAMP) == GS_CAN_MODE_HW_TIMESTAMP)
         try:
             data = self.gs_usb.read(0x81, frame.__sizeof__(hw_timestamps), timeout_ms)
         except usb.core.USBError:
