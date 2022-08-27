@@ -1,10 +1,12 @@
 from .constants import CAN_EFF_FLAG, CAN_RTR_FLAG, CAN_ERR_FLAG, CAN_EFF_MASK
+from struct import *
 
 # gs_usb general
 GS_USB_ECHO_ID = 0
 GS_USB_NONE_ECHO_ID = 0xFFFFFFFF
-GS_USB_FRAME_SIZE = 24
 
+GS_USB_FRAME_SIZE = 20
+GS_USB_FRAME_SIZE_HW_TIMESTAMP = 24
 
 class GsUsbFrame:
     def __init__(self, can_id=0, data=[]):
@@ -41,8 +43,11 @@ class GsUsbFrame:
     def timestamp(self):
         return self.timestamp_us / 1000000.0
 
-    def __sizeof__(self):
-        return GS_USB_FRAME_SIZE
+    def __sizeof__(self, hw_timestamp):
+        if (hw_timestamp == True):
+            return GS_USB_FRAME_SIZE_HW_TIMESTAMP
+        else:
+            return GS_USB_FRAME_SIZE
 
     def __str__(self) -> str:
         data = (
@@ -51,3 +56,28 @@ class GsUsbFrame:
             else " ".join("{:02X}".format(b) for b in self.data[:self.can_dlc])
         )
         return "{: >8X}   [{}]  {}".format(self.arbitration_id, self.can_dlc, data)
+
+    def pack(self, hw_timestamp):
+        if (hw_timestamp == True):
+            return pack("<2I12BI",
+                self.echo_id, self.can_id, self.can_dlc, self.channel,
+                self.flags, self.reserved, *self.data, self.timestamp_us
+            )
+        else:
+            return pack("<2I12B",
+                self.echo_id, self.can_id, self.can_dlc, self.channel,
+                self.flags, self.reserved, *self.data,
+            )
+
+    @staticmethod
+    def unpack_into(frame, data: bytes, hw_timestamp):
+        if (hw_timestamp == True):
+            (
+                frame.echo_id, frame.can_id, frame.can_dlc, frame.channel,
+                frame.flags, frame.reserved, *frame.data, frame.timestamp_us,
+            ) = unpack("<2I12BI", data)
+        else:
+            (
+                frame.echo_id, frame.can_id, frame.can_dlc, frame.channel,
+                frame.flags, frame.reserved, *frame.data,
+            ) = unpack("<2I12B", data)

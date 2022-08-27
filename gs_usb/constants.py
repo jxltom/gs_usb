@@ -1,3 +1,15 @@
+# gs_usb mode flags (commented out features are not implemented)
+GS_CAN_MODE_NORMAL = 0
+GS_CAN_MODE_LISTEN_ONLY = (1 << 0)
+GS_CAN_MODE_LOOP_BACK = (1 << 1)
+#GS_CAN_MODE_TRIPLE_SAMPLE = (1 << 2)
+GS_CAN_MODE_ONE_SHOT = (1 << 3)
+GS_CAN_MODE_HW_TIMESTAMP = (1 << 4)
+#GS_CAN_MODE_IDENTIFY = (1 << 5)
+#GS_CAN_MODE_USER_ID = (1 << 6)
+#GS_CAN_MODE_PAD_PKTS_TO_MAX_PKT_SIZE = (1 << 7)
+#GS_CAN_MODE_FD = (1 << 8)
+
 # Special address description flags for the CAN_ID
 CAN_EFF_FLAG = 0x80000000  # EFF/SFF is set in the MSB
 CAN_RTR_FLAG = 0x40000000  # remote transmission request
