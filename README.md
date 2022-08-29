@@ -1,6 +1,6 @@
 # gs_usb
 
-Python Windows/Linux/Mac CAN driver based on usbfs or WinUSB WCID for Geschwister Schneider USB/CAN devices and candleLight USB CAN interfaces.
+Python Windows/Linux/Mac CAN driver based on usbfs or WinUSB WCID for Geschwister Schneider USB/CAN devices, candleLight USB CAN interfaces, CAN Debugger devices and other interfaces utilising the gs_usb driver.
 
 ## Getting Started
 
