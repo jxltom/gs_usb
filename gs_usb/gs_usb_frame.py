@@ -61,7 +61,7 @@ class GsUsbFrame:
         if (hw_timestamp == True):
             return pack("<2I12BI",
                 self.echo_id, self.can_id, self.can_dlc, self.channel,
-                self.flags, self.reserved, *self.data, self.timestamp_us
+                self.flags, self.reserved, *self.data, self.timestamp_us & 0xffffffff
             )
         else:
             return pack("<2I12B",
