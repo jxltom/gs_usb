@@ -52,22 +52,30 @@ def main():
 
     # Read all the time and send message in each second
     end_time, n = time.time() + 1, -1
-    while True:
-        iframe = GsUsbFrame()
-        if dev.read(iframe, 1):
-            print("RX  {}".format(iframe))
+    try:
+        while True:
+            iframe = GsUsbFrame()
+            if dev.read(iframe, 1):
+                print("RX  {}".format(iframe))
 
-        if time.time() - end_time >= 0:
-            end_time = time.time() + 1
-            n += 1
-            n %= len(frames)
+            if time.time() - end_time >= 0:
+                end_time = time.time() + 1
+                n += 1
+                n %= len(frames)
 
-            if dev.send(frames[n]):
-                print("TX  {}".format(frames[n]))
+                if dev.send(frames[n]):
+                    print("TX  {}".format(frames[n]))
+                else:
+                    state = dev.get_state()
+                    if state:
+                        print("TX FAILED — device state: {}".format(state))
+                    else:
+                        print("TX FAILED")
+    except KeyboardInterrupt:
+        pass
+    finally:
+        dev.stop()
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    main()

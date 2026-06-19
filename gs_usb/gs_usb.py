@@ -5,9 +5,19 @@ from usb.backend import libusb1
 import usb.core
 import usb.util
 
-from .gs_usb_structures import *
-from .gs_usb_frame import *
-from .constants import *
+from .gs_usb_structures import DeviceMode, DeviceBitTiming, DeviceInfo, DeviceCapability, DeviceBtConstExtended, DeviceState
+from .gs_usb_frame import (
+    GsUsbFrame,
+    GS_USB_FRAME_SIZE, GS_USB_FRAME_SIZE_HW_TIMESTAMP,
+    GS_USB_FRAME_SIZE_FD, GS_USB_FRAME_SIZE_FD_HW_TIMESTAMP,
+)
+from .constants import (
+    GS_CAN_MODE_NORMAL, GS_CAN_MODE_LISTEN_ONLY, GS_CAN_MODE_LOOP_BACK,
+    GS_CAN_MODE_ONE_SHOT, GS_CAN_MODE_HW_TIMESTAMP,
+    GS_CAN_MODE_PAD_PKTS_TO_MAX_PKT_SIZE, GS_CAN_MODE_FD,
+    GS_CAN_FEATURE_BT_CONST_EXT, GS_CAN_FEATURE_IDENTIFY,
+    GS_CAN_FEATURE_TERMINATION, GS_CAN_FEATURE_GET_STATE,
+)
 
 # gs_usb VIDs/PIDs (devices currently in the linux kernel driver)
 GS_USB_ID_VENDOR = 0x1D50
@@ -36,6 +46,12 @@ _GS_USB_BREQ_MODE = 2
 _GS_USB_BREQ_BERR = 3
 _GS_USB_BREQ_BT_CONST = 4
 _GS_USB_BREQ_DEVICE_CONFIG = 5
+_GS_USB_BREQ_IDENTIFY = 7
+_GS_USB_BREQ_DATA_BITTIMING = 10
+_GS_USB_BREQ_BT_CONST_EXT = 11
+_GS_USB_BREQ_SET_TERMINATION = 12
+_GS_USB_BREQ_GET_TERMINATION = 13
+_GS_USB_BREQ_GET_STATE = 14
 
 
 class GsUsb:
@@ -47,7 +63,7 @@ class GsUsb:
     def start(self, flags=(GS_CAN_MODE_NORMAL | GS_CAN_MODE_HW_TIMESTAMP)):
         r"""
         Start gs_usb device
-        :param flags: GS_CAN_MODE_LISTEN_ONLY, GS_CAN_MODE_HW_TIMESTAMP, etc.
+        :param flags: GS_CAN_MODE_LISTEN_ONLY, GS_CAN_MODE_HW_TIMESTAMP, GS_CAN_MODE_FD, etc.
         """
         # Reset to support restart multiple times
         self.gs_usb.reset()
@@ -58,11 +74,15 @@ class GsUsb:
         ):
             self.gs_usb.detach_kernel_driver(0)
 
-        #Only allow features that the device supports
+        # Only allow features that the device supports
         flags &= self.device_capability.feature
 
         # Only allow features that this driver supports
-        flags &= GS_CAN_MODE_LISTEN_ONLY | GS_CAN_MODE_LOOP_BACK | GS_CAN_MODE_ONE_SHOT | GS_CAN_MODE_HW_TIMESTAMP
+        supported = (
+            GS_CAN_MODE_LISTEN_ONLY | GS_CAN_MODE_LOOP_BACK | GS_CAN_MODE_ONE_SHOT
+            | GS_CAN_MODE_HW_TIMESTAMP | GS_CAN_MODE_FD | GS_CAN_MODE_PAD_PKTS_TO_MAX_PKT_SIZE
+        )
+        flags &= supported
         self.device_flags = flags
 
         mode = DeviceMode(GS_CAN_MODE_START, flags)
@@ -153,14 +173,51 @@ class GsUsb:
         bit_timing = DeviceBitTiming(prop_seg, phase_seg1, phase_seg2, sjw, brp)
         self.gs_usb.ctrl_transfer(0x41, _GS_USB_BREQ_BITTIMING, 0, 0, bit_timing.pack())
 
+    def set_data_bitrate(self, bitrate):
+        r"""
+        Set CAN FD data phase bitrate (80 MHz clock devices).
+        Common rates: 1000000, 2000000, 4000000, 5000000, 8000000
+        Returns True on success, False if bitrate is unsupported.
+        """
+        if self.device_capability.fclk_can == 80000000:
+            # prop=0, timing computed for ~80% sample point
+            if bitrate == 1000000:
+                return self.set_data_timing(0, 15, 4, 4, 4)
+            elif bitrate == 2000000:
+                return self.set_data_timing(0, 15, 4, 4, 2)
+            elif bitrate == 4000000:
+                return self.set_data_timing(0, 15, 4, 4, 1)
+            elif bitrate == 5000000:
+                return self.set_data_timing(0, 12, 3, 3, 1)
+            elif bitrate == 8000000:
+                return self.set_data_timing(0, 7, 2, 2, 1)
+        return False
+
+    def set_data_timing(self, prop_seg, phase_seg1, phase_seg2, sjw, brp):
+        r"""
+        Set CAN FD data phase bit timing.
+        :param prop_seg: propagation segment
+        :param phase_seg1: phase segment 1
+        :param phase_seg2: phase segment 2
+        :param sjw: synchronization jump width
+        :param brp: bit rate prescaler
+        :return: True
+        """
+        bit_timing = DeviceBitTiming(prop_seg, phase_seg1, phase_seg2, sjw, brp)
+        self.gs_usb.ctrl_transfer(0x41, _GS_USB_BREQ_DATA_BITTIMING, 0, 0, bit_timing.pack())
+        return True
+
     def send(self, frame):
         r"""
-        Send frame
+        Send frame.
         :param frame: GsUsbFrame
+        :return: True on success, False if the device rejected the write (e.g. bus-off)
         """
-        #Frame size is different depending on HW timestamp feature support
-        hw_timestamps = ((self.device_flags & GS_CAN_MODE_HW_TIMESTAMP) == GS_CAN_MODE_HW_TIMESTAMP)
-        self.gs_usb.write(0x02, frame.pack(hw_timestamps))
+        # TX frames never carry a hardware timestamp (that field is RX-only, added by the device)
+        try:
+            self.gs_usb.write(0x02, frame.pack(hw_timestamp=False))
+        except usb.core.USBTimeoutError:
+            return False
         return True
 
     def read(self, frame, timeout_ms):
@@ -171,10 +228,16 @@ class GsUsb:
                            Note that timeout as 0 will block forever if no message is received
         :return: return True if success else False
         """
-        #Frame size is different depending on HW timestamp feature support
-        hw_timestamps = ((self.device_flags & GS_CAN_MODE_HW_TIMESTAMP) == GS_CAN_MODE_HW_TIMESTAMP)
+        hw_timestamps = bool(self.device_flags & GS_CAN_MODE_HW_TIMESTAMP)
+        fd_mode = bool(self.device_flags & GS_CAN_MODE_FD)
+
+        if fd_mode:
+            max_size = GS_USB_FRAME_SIZE_FD_HW_TIMESTAMP if hw_timestamps else GS_USB_FRAME_SIZE_FD
+        else:
+            max_size = GS_USB_FRAME_SIZE_HW_TIMESTAMP if hw_timestamps else GS_USB_FRAME_SIZE
+
         try:
-            data = self.gs_usb.read(0x81, frame.__sizeof__(hw_timestamps), timeout_ms)
+            data = self.gs_usb.read(0x81, max_size, timeout_ms)
         except usb.core.USBError:
             return False
 
@@ -207,12 +270,66 @@ class GsUsb:
     @property
     def device_capability(self):
         r"""
-        Get gs_usb device capability
+        Get gs_usb device capability. Returns DeviceBtConstExtended for FD-capable devices
+        that support the extended bit timing constant, DeviceCapability otherwise.
         """
-        if self.capability == None:
+        if self.capability is None:
             data = self.gs_usb.ctrl_transfer(0xC1, _GS_USB_BREQ_BT_CONST, 0, 0, 40)
-            self.capability = DeviceCapability.unpack(data)
+            cap = DeviceCapability.unpack(data)
+            if cap.feature & GS_CAN_FEATURE_BT_CONST_EXT:
+                ext_data = self.gs_usb.ctrl_transfer(0xC1, _GS_USB_BREQ_BT_CONST_EXT, 0, 0, 72)
+                self.capability = DeviceBtConstExtended.unpack(ext_data)
+            else:
+                self.capability = cap
         return self.capability
+
+    def get_state(self):
+        r"""
+        Query the CAN controller state (error counters, bus-off, etc.).
+        Returns a DeviceState, or None if the device does not support this request.
+        """
+        if not (self.device_capability.feature & GS_CAN_FEATURE_GET_STATE):
+            return None
+        try:
+            data = self.gs_usb.ctrl_transfer(0xC1, _GS_USB_BREQ_GET_STATE, 0, 0, 12)
+            return DeviceState.unpack(data)
+        except usb.core.USBError:
+            return None
+
+    def identify(self, on):
+        r"""
+        Turn the device identify LED on or off.
+        Returns True on success, False if the device does not support identify.
+        """
+        if not (self.device_capability.feature & GS_CAN_FEATURE_IDENTIFY):
+            return False
+        mode = 1 if on else 0
+        self.gs_usb.ctrl_transfer(0x41, _GS_USB_BREQ_IDENTIFY, 0, 0, pack("<I", mode))
+        return True
+
+    def get_termination(self):
+        r"""
+        Read the built-in bus termination resistor state.
+        Returns True if termination is active, False if off, None if unsupported.
+        """
+        if not (self.device_capability.feature & GS_CAN_FEATURE_TERMINATION):
+            return None
+        try:
+            data = self.gs_usb.ctrl_transfer(0xC1, _GS_USB_BREQ_GET_TERMINATION, 0, 0, 4)
+            return unpack("<I", data)[0] != 0
+        except usb.core.USBError:
+            return None
+
+    def set_termination(self, on):
+        r"""
+        Enable or disable the built-in bus termination resistor.
+        Returns True on success, False if the device does not support termination.
+        """
+        if not (self.device_capability.feature & GS_CAN_FEATURE_TERMINATION):
+            return False
+        state = 1 if on else 0
+        self.gs_usb.ctrl_transfer(0x41, _GS_USB_BREQ_SET_TERMINATION, 0, 0, pack("<I", state))
+        return True
 
     def __str__(self):
         try:
